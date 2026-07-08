@@ -41,9 +41,13 @@ from prompts import SQL_PROMPT_INSTRUCTION
 from greet import authenticate_user
 from cs_agent.security.sanitizer import sanitize_input
 from cs_agent.a2a.client import call_a2a_agent
+from telemetry import get_tracer, ATTR
 
 load_dotenv()
 os.environ.pop("GOOGLE_GENAI_USE_VERTEXAI", None)
+
+# Observability (Phoenix). No-op unless TELEMETRY=true — see telemetry.py / .env.
+tracer = get_tracer()
 
 A2A_JUDGE_HOST = os.getenv("A2A_JUDGE_HOST", "localhost")
 A2A_JUDGE_PORT = int(os.getenv("A2A_JUDGE_PORT", "10002"))
@@ -145,40 +149,77 @@ async def chat(req: ChatReq):
     if runner is None:
         return JSONResponse({"ok": False, "error": "Not logged in."}, status_code=401)
 
-    # Layer 1 — local sanitization
-    try:
-        clean = sanitize_input(req.message)
-    except ValueError as exc:
-        return {"ok": True, "blocked": True, "stage": "sanitizer",
-                "response": f"Input rejected by sanitizer: {exc}", "tool_calls": []}
+    # One trace span per turn (text path). Sub-spans mirror the CLI: sanitize ->
+    # judge -> per-tool -> mask. The agent's own model call is auto-instrumented.
+    with tracer.start_as_current_span("agent.turn") as turn_span:
+        turn_span.set_attribute(ATTR.OPENINFERENCE_SPAN_KIND, "CHAIN")
+        turn_span.set_attribute(ATTR.INPUT_VALUE, req.message)
+        turn_span.set_attribute("user.id", req.user_id)
+        turn_span.set_attribute("turn.channel", "text")
 
-    # Layer 2 — A2A Security Judge
-    try:
-        if not await _judge(clean):
+        # Layer 1 — local sanitization
+        with tracer.start_as_current_span("security.sanitize") as s_span:
+            s_span.set_attribute(ATTR.OPENINFERENCE_SPAN_KIND, "GUARDRAIL")
+            s_span.set_attribute(ATTR.INPUT_VALUE, req.message)
+            try:
+                clean = sanitize_input(req.message)
+                s_span.set_attribute(ATTR.OUTPUT_VALUE, "passed")
+            except ValueError as exc:
+                s_span.set_attribute(ATTR.OUTPUT_VALUE, f"blocked: {exc}")
+                turn_span.set_attribute("turn.blocked", True)
+                turn_span.set_attribute("turn.block_reason", "sanitizer")
+                return {"ok": True, "blocked": True, "stage": "sanitizer",
+                        "response": f"Input rejected by sanitizer: {exc}", "tool_calls": []}
+
+        # Layer 2 — A2A Security Judge
+        with tracer.start_as_current_span("security.a2a_judge") as j_span:
+            j_span.set_attribute(ATTR.OPENINFERENCE_SPAN_KIND, "GUARDRAIL")
+            j_span.set_attribute(ATTR.INPUT_VALUE, clean)
+            try:
+                passed = await _judge(clean)
+            except Exception as exc:
+                j_span.set_attribute(ATTR.OUTPUT_VALUE, f"error: {exc}")
+                return JSONResponse({"ok": False, "error": f"Security Judge unreachable: {exc}"}, status_code=502)
+            j_span.set_attribute(ATTR.OUTPUT_VALUE, "passed" if passed else "blocked")
+        if not passed:
+            turn_span.set_attribute("turn.blocked", True)
+            turn_span.set_attribute("turn.block_reason", "judge")
+            turn_span.set_attribute(ATTR.OUTPUT_VALUE, "BLOCKED: judge")
             return {"ok": True, "blocked": True, "stage": "judge",
                     "response": "Blocked by the A2A Security Judge (possible injection/unsafe input).",
                     "tool_calls": []}
-    except Exception as exc:
-        return JSONResponse({"ok": False, "error": f"Security Judge unreachable: {exc}"}, status_code=502)
 
-    # Agent turn (+ MCP tools)
-    content = types.Content(role="user", parts=[types.Part(text=clean)])
-    tool_calls, final_text = [], ""
-    for event in runner.run(user_id=req.user_id, session_id=f"session_{req.user_id}", new_message=content):
-        for fc in (event.get_function_calls() or []):
-            tool_calls.append({"name": fc.name, "args": dict(fc.args or {}), "result": None})
-        for fr in (event.get_function_responses() or []):
-            rs = json.dumps(fr.response) if isinstance(fr.response, dict) else str(fr.response)
-            for tc in reversed(tool_calls):
-                if tc["name"] == fr.name and tc["result"] is None:
-                    tc["result"] = rs[:800]
-                    break
-        if event.is_final_response() and event.content:
-            final_text = event.content.parts[0].text
+        # Agent turn (+ MCP tools)
+        content = types.Content(role="user", parts=[types.Part(text=clean)])
+        tool_calls, final_text = [], ""
+        for event in runner.run(user_id=req.user_id, session_id=f"session_{req.user_id}", new_message=content):
+            for fc in (event.get_function_calls() or []):
+                tool_calls.append({"name": fc.name, "args": dict(fc.args or {}), "result": None})
+            for fr in (event.get_function_responses() or []):
+                rs = json.dumps(fr.response) if isinstance(fr.response, dict) else str(fr.response)
+                for tc in reversed(tool_calls):
+                    if tc["name"] == fr.name and tc["result"] is None:
+                        tc["result"] = rs[:800]
+                        with tracer.start_as_current_span(f"tool.{fr.name}") as tc_span:
+                            tc_span.set_attribute(ATTR.OPENINFERENCE_SPAN_KIND, "TOOL")
+                            tc_span.set_attribute(ATTR.TOOL_NAME, fr.name)
+                            tc_span.set_attribute(ATTR.INPUT_VALUE, json.dumps(tc["args"]))
+                            tc_span.set_attribute(ATTR.OUTPUT_VALUE, tc["result"])
+                        break
+            if event.is_final_response() and event.content:
+                final_text = event.content.parts[0].text
 
-    # Layer 3 — A2A Data Masker on the way out
-    masked = await _mask(final_text)
-    return {"ok": True, "blocked": False, "response": masked, "tool_calls": tool_calls}
+        # Layer 3 — A2A Data Masker on the way out
+        with tracer.start_as_current_span("security.a2a_mask") as m_span:
+            m_span.set_attribute(ATTR.OPENINFERENCE_SPAN_KIND, "GUARDRAIL")
+            m_span.set_attribute(ATTR.INPUT_VALUE, final_text[:500])
+            masked = await _mask(final_text)
+            m_span.set_attribute(ATTR.OUTPUT_VALUE, masked[:500])
+
+        if tool_calls:
+            turn_span.set_attribute("llm.tool_calls", json.dumps([t["name"] for t in tool_calls]))
+        turn_span.set_attribute(ATTR.OUTPUT_VALUE, masked)
+        return {"ok": True, "blocked": False, "response": masked, "tool_calls": tool_calls}
 
 
 @app.post("/api/chat/stream")
@@ -195,23 +236,44 @@ async def chat_stream(req: ChatReq):
         return JSONResponse({"ok": False, "error": "Not logged in."}, status_code=401)
 
     async def gen():
+      # One trace span per streamed turn (text path). No-op unless TELEMETRY=true.
+      with tracer.start_as_current_span("agent.turn") as turn_span:
+        turn_span.set_attribute(ATTR.OPENINFERENCE_SPAN_KIND, "CHAIN")
+        turn_span.set_attribute(ATTR.INPUT_VALUE, req.message)
+        turn_span.set_attribute("user.id", req.user_id)
+        turn_span.set_attribute("turn.channel", "text-stream")
+
         # Layer 1 — local sanitization
-        try:
-            clean = sanitize_input(req.message)
-        except ValueError as exc:
-            yield json.dumps({"type": "blocked", "stage": "sanitizer",
-                              "response": f"Input rejected by sanitizer: {exc}"}) + "\n"
-            return
+        with tracer.start_as_current_span("security.sanitize") as s_span:
+            s_span.set_attribute(ATTR.OPENINFERENCE_SPAN_KIND, "GUARDRAIL")
+            s_span.set_attribute(ATTR.INPUT_VALUE, req.message)
+            try:
+                clean = sanitize_input(req.message)
+                s_span.set_attribute(ATTR.OUTPUT_VALUE, "passed")
+            except ValueError as exc:
+                s_span.set_attribute(ATTR.OUTPUT_VALUE, f"blocked: {exc}")
+                turn_span.set_attribute("turn.blocked", True)
+                yield json.dumps({"type": "blocked", "stage": "sanitizer",
+                                  "response": f"Input rejected by sanitizer: {exc}"}) + "\n"
+                return
 
         # Layer 2 — A2A Security Judge
-        try:
-            if not await _judge(clean):
-                yield json.dumps({"type": "blocked", "stage": "judge",
-                                  "response": "Blocked by the A2A Security Judge "
-                                              "(possible injection/unsafe input)."}) + "\n"
+        with tracer.start_as_current_span("security.a2a_judge") as j_span:
+            j_span.set_attribute(ATTR.OPENINFERENCE_SPAN_KIND, "GUARDRAIL")
+            j_span.set_attribute(ATTR.INPUT_VALUE, clean)
+            try:
+                passed = await _judge(clean)
+            except Exception as exc:
+                j_span.set_attribute(ATTR.OUTPUT_VALUE, f"error: {exc}")
+                yield json.dumps({"type": "error", "message": f"Security Judge unreachable: {exc}"}) + "\n"
                 return
-        except Exception as exc:
-            yield json.dumps({"type": "error", "message": f"Security Judge unreachable: {exc}"}) + "\n"
+            j_span.set_attribute(ATTR.OUTPUT_VALUE, "passed" if passed else "blocked")
+        if not passed:
+            turn_span.set_attribute("turn.blocked", True)
+            turn_span.set_attribute("turn.block_reason", "judge")
+            yield json.dumps({"type": "blocked", "stage": "judge",
+                              "response": "Blocked by the A2A Security Judge "
+                                          "(possible injection/unsafe input)."}) + "\n"
             return
 
         content = types.Content(role="user", parts=[types.Part(text=clean)])
@@ -232,6 +294,11 @@ async def chat_stream(req: ChatReq):
                     for tc in reversed(tool_calls):
                         if tc["name"] == fr.name and tc["result"] is None:
                             tc["result"] = rs[:800]
+                            with tracer.start_as_current_span(f"tool.{fr.name}") as tc_span:
+                                tc_span.set_attribute(ATTR.OPENINFERENCE_SPAN_KIND, "TOOL")
+                                tc_span.set_attribute(ATTR.TOOL_NAME, fr.name)
+                                tc_span.set_attribute(ATTR.INPUT_VALUE, json.dumps(tc["args"]))
+                                tc_span.set_attribute(ATTR.OUTPUT_VALUE, tc["result"])
                             break
                 txt = None
                 if event.content and event.content.parts and event.content.parts[0].text:
@@ -244,6 +311,7 @@ async def chat_stream(req: ChatReq):
                     continue          # redundant final aggregate that repeats the partials
                 display += txt
                 yield json.dumps({"type": "delta", "text": display}) + "\n"
+            turn_span.set_attribute(ATTR.OUTPUT_VALUE, display)
             yield json.dumps({"type": "final", "text": display, "tool_calls": tool_calls}) + "\n"
         else:
             # MASK on -> can't stream; run to completion, mask, send one final chunk.
@@ -256,10 +324,20 @@ async def chat_stream(req: ChatReq):
                     for tc in reversed(tool_calls):
                         if tc["name"] == fr.name and tc["result"] is None:
                             tc["result"] = rs[:800]
+                            with tracer.start_as_current_span(f"tool.{fr.name}") as tc_span:
+                                tc_span.set_attribute(ATTR.OPENINFERENCE_SPAN_KIND, "TOOL")
+                                tc_span.set_attribute(ATTR.TOOL_NAME, fr.name)
+                                tc_span.set_attribute(ATTR.INPUT_VALUE, json.dumps(tc["args"]))
+                                tc_span.set_attribute(ATTR.OUTPUT_VALUE, tc["result"])
                             break
                 if event.is_final_response() and event.content:
                     display = event.content.parts[0].text or ""
-            masked = await _mask(display)
+            with tracer.start_as_current_span("security.a2a_mask") as m_span:
+                m_span.set_attribute(ATTR.OPENINFERENCE_SPAN_KIND, "GUARDRAIL")
+                m_span.set_attribute(ATTR.INPUT_VALUE, display[:500])
+                masked = await _mask(display)
+                m_span.set_attribute(ATTR.OUTPUT_VALUE, masked[:500])
+            turn_span.set_attribute(ATTR.OUTPUT_VALUE, masked)
             yield json.dumps({"type": "final", "text": masked, "tool_calls": tool_calls}) + "\n"
 
     return StreamingResponse(gen(), media_type="application/x-ndjson")

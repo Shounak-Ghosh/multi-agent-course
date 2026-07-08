@@ -41,9 +41,15 @@ from toolbox_core import ToolboxSyncClient
 from memory import search_memory
 from greet import authenticate_user
 from cs_agent.voice import make_voice_agent, run_voice_session, VOICE_MODEL, VOICE_NAME
+from telemetry import get_tracer
 
 load_dotenv()
 os.environ.pop("GOOGLE_GENAI_USE_VERTEXAI", None)
+
+# Observability (Phoenix). No-op unless TELEMETRY=true — see telemetry.py / .env.
+# Init here so the Live model calls in voice.py are auto-instrumented for both
+# typed and spoken turns (they share this process).
+get_tracer()
 
 logger = logging.getLogger(__name__)
 

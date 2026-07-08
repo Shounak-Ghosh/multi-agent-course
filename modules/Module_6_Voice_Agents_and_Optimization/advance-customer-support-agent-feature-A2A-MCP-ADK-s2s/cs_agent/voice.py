@@ -40,6 +40,11 @@ from google.genai import types
 from prompts import SQL_PROMPT_INSTRUCTION
 from cs_agent.a2a.client import call_a2a_agent
 from cs_agent.security.sanitizer import sanitize_input
+from telemetry import get_tracer, ATTR
+
+# Observability (Phoenix). No-op unless TELEMETRY=true. The Live model calls are
+# auto-instrumented once web.py calls get_tracer(); this adds a guardrail span.
+tracer = get_tracer()
 
 logger = logging.getLogger(__name__)
 
@@ -179,14 +184,20 @@ async def _judge_transcript(text: str) -> bool:
     text = (text or "").strip()
     if not text:
         return True
-    try:
-        verdict = await call_a2a_agent(
-            query=text, host=A2A_JUDGE_HOST, port=A2A_JUDGE_PORT
-        )
-        return "BLOCKED" not in (verdict or "").upper()
-    except Exception as exc:  # noqa: BLE001 - best-effort guardrail
-        logger.warning("Voice transcript guardrail: Judge unreachable: %s", exc)
-        return True
+    with tracer.start_as_current_span("security.a2a_judge") as _j_span:
+        _j_span.set_attribute(ATTR.OPENINFERENCE_SPAN_KIND, "GUARDRAIL")
+        _j_span.set_attribute(ATTR.INPUT_VALUE, text)
+        try:
+            verdict = await call_a2a_agent(
+                query=text, host=A2A_JUDGE_HOST, port=A2A_JUDGE_PORT
+            )
+            passed = "BLOCKED" not in (verdict or "").upper()
+            _j_span.set_attribute(ATTR.OUTPUT_VALUE, "passed" if passed else "blocked")
+            return passed
+        except Exception as exc:  # noqa: BLE001 - best-effort guardrail
+            logger.warning("Voice transcript guardrail: Judge unreachable: %s", exc)
+            _j_span.set_attribute(ATTR.OUTPUT_VALUE, f"error(open): {exc}")
+            return True
 
 
 async def run_voice_session(websocket, runner, user_id: str, session_id: str) -> None:

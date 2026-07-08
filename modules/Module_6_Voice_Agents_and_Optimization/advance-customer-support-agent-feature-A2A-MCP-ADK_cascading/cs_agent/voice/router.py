@@ -39,6 +39,10 @@ from cs_agent.security.sanitizer import sanitize_input
 from cs_agent.voice.stt import transcribe
 from cs_agent.voice.tts import synthesize_stream
 from cs_agent.voice import cost
+from telemetry import get_tracer, ATTR
+
+# Observability (Phoenix). No-op unless TELEMETRY=true. Shared with web.py (idempotent).
+tracer = get_tracer()
 
 
 def _flag(name: str, default: str) -> bool:
@@ -164,20 +168,30 @@ def make_voice_router(*, runners, session_service, judge, mask) -> APIRouter:
                 turn_t0 = time.perf_counter()   # whole-response wall clock
 
                 # [1] local sanitizer
-                try:
-                    clean = sanitize_input(text)
-                except ValueError as exc:
-                    await send_json({"type": "blocked", "stage": "sanitizer",
-                                     "response": f"Input rejected by sanitizer: {exc}"})
-                    await send_json({"type": "turn_end"})
-                    pending = ""
-                    stt_acc["in"] = stt_acc["out"] = 0
-                    stt_time["sec"] = 0.0
-                    return
+                with tracer.start_as_current_span("security.sanitize") as _s_span:
+                    _s_span.set_attribute(ATTR.OPENINFERENCE_SPAN_KIND, "GUARDRAIL")
+                    _s_span.set_attribute(ATTR.INPUT_VALUE, text)
+                    try:
+                        clean = sanitize_input(text)
+                        _s_span.set_attribute(ATTR.OUTPUT_VALUE, "passed")
+                    except ValueError as exc:
+                        _s_span.set_attribute(ATTR.OUTPUT_VALUE, f"blocked: {exc}")
+                        await send_json({"type": "blocked", "stage": "sanitizer",
+                                         "response": f"Input rejected by sanitizer: {exc}"})
+                        await send_json({"type": "turn_end"})
+                        pending = ""
+                        stt_acc["in"] = stt_acc["out"] = 0
+                        stt_time["sec"] = 0.0
+                        return
 
                 # [2] A2A Security Judge
                 t = time.perf_counter()
-                if not await judge(clean):
+                with tracer.start_as_current_span("security.a2a_judge") as _j_span:
+                    _j_span.set_attribute(ATTR.OPENINFERENCE_SPAN_KIND, "GUARDRAIL")
+                    _j_span.set_attribute(ATTR.INPUT_VALUE, clean)
+                    judge_ok = await judge(clean)
+                    _j_span.set_attribute(ATTR.OUTPUT_VALUE, "passed" if judge_ok else "blocked")
+                if not judge_ok:
                     await send_json({"type": "blocked", "stage": "judge",
                                      "response": "Blocked by the A2A Security Judge."})
                     await send_json({"type": "turn_end"})
@@ -324,7 +338,11 @@ def make_voice_router(*, runners, session_service, judge, mask) -> APIRouter:
                     if MASK_ENABLED:
                         t = time.perf_counter()
                         pre_mask = final_text
-                        final_text = await mask(final_text)
+                        with tracer.start_as_current_span("security.a2a_mask") as _m_span:
+                            _m_span.set_attribute(ATTR.OPENINFERENCE_SPAN_KIND, "GUARDRAIL")
+                            _m_span.set_attribute(ATTR.INPUT_VALUE, pre_mask[:500])
+                            final_text = await mask(final_text)
+                            _m_span.set_attribute(ATTR.OUTPUT_VALUE, final_text[:500])
                         clock("mask", t)
                         # remote A2A call: estimate tokens from text in/out
                         mask_tok["in"] = cost.estimate_tokens(pre_mask)
