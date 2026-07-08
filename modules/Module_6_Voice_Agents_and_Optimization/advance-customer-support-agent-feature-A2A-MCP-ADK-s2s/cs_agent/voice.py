@@ -2,7 +2,7 @@
 
 This module is the *engine* only — it holds no server/socket state and opens no
 external connections at import time, so it is safe to unit-test and reuse. The
-FastAPI app that wires a browser WebSocket to it lives in ``cs_agent/voice_web.py``.
+FastAPI app that wires a browser WebSocket to it lives in ``cs_agent/web.py``.
 
 How it works
 ------------

@@ -374,6 +374,11 @@ MODEL_ARMOR_TEMPLATE_ID=
 # Requires a Gemini Live model your GOOGLE_API_KEY can access.
 # VOICE_MODEL=gemini-3.1-flash-live-preview
 # VOICE_NAME=Kore
+
+# Observability: TELEMETRY=true launches Arize Phoenix (http://localhost:6006) and
+# traces every turn (text + voice). Set false for a fully-off, zero-overhead run
+# (e.g. benchmarking).
+TELEMETRY=true
 ENVEOF
     warn ".env created — you MUST fill GOOGLE_API_KEY and MEM0_API_KEY before ./run.sh"
   else
@@ -479,7 +484,9 @@ cmd_voice() {
   say "Launching VOICE UI at http://127.0.0.1:$VOICE_PORT  (real-time speech-to-speech)"
   say "Open it in a browser, sign in, then tap the mic. Requires a Gemini Live model."
   echo "----------------------------------------------------------------------"
-  ( cd "$PROJECT_DIR" && VOICE_PORT="$VOICE_PORT" python -m cs_agent.voice_web \
+  # The voice server IS cs_agent.web (its main() serves on VOICE_PORT, default 8001).
+  # There is no cs_agent.voice_web module.
+  ( cd "$PROJECT_DIR" && VOICE_PORT="$VOICE_PORT" python -m cs_agent.web \
       2> >(grep --line-buffered -vE "$WARN_FILTER" >&2) )
 }
 

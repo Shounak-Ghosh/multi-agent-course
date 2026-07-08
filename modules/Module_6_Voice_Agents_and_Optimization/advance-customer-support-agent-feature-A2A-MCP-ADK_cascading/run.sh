@@ -367,6 +367,11 @@ MEM0_API_KEY=
 GOOGLE_CLOUD_PROJECT=
 GOOGLE_CLOUD_LOCATION=
 MODEL_ARMOR_TEMPLATE_ID=
+
+# Observability: TELEMETRY=true launches Arize Phoenix (http://localhost:6006) and
+# traces every turn (text + voice). Set false for a fully-off, zero-overhead run
+# (e.g. benchmarking).
+TELEMETRY=true
 ENVEOF
     warn ".env created — you MUST fill GOOGLE_API_KEY and MEM0_API_KEY before ./run.sh"
   else

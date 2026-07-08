@@ -6,7 +6,7 @@ prompts, A2A client) rather than duplicating them. The text CLI (``agent_cli.py`
 and the text web UI (``web.py``) are left completely untouched, so they keep working
 exactly as before.
 
-Run it:  ./run.sh voice        (or: python -m cs_agent.voice_web)
+Run it:  ./run.sh voice        (or: python -m cs_agent.web)
 Needs the same services as the text UI: Postgres, MCP Toolbox (:5000), A2A (:10002/:10003),
 plus a GOOGLE_API_KEY whose project has access to the Gemini Live model (see voice.py:VOICE_MODEL).
 
