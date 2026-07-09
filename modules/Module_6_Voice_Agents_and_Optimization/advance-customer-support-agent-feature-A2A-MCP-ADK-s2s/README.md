@@ -1,6 +1,23 @@
-# Customer Support Agent — Quick Start
+# Customer Support Voice Agent — Speech-to-Speech (Gemini Live)
 
-Multi-agent customer support CLI built with Google ADK, MCP Toolbox, A2A security microservices, Mem0 memory, and Arize Phoenix observability. Runs entirely locally — no GCP credentials required.
+A **native speech-to-speech (S2S)** voice agent: audio goes straight into a **Gemini Live**
+model via ADK bidirectional streaming (`runner.run_live()`, `RunConfig(streaming_mode=BIDI,
+response_modalities=["AUDIO"])`) and audio comes straight back out. The same ADK agent (MCP
+DB tools + Mem0) calls tools inline — there is no separate STT/LLM/TTS cascade.
+
+Because the model hears raw audio, the text pipeline can't gate it up front: security is a
+**post-hoc transcript guardrail** — the A2A Judge inspects the Live API's transcription
+*after* the model has already heard it, and output masking is display/log-only. That weaker
+guarantee is inherent to native S2S and is a deliberate, documented trade-off for lower
+latency and more natural turn-taking.
+
+Built with Google ADK, MCP Toolbox, A2A security microservices, Mem0 memory, and Arize
+Phoenix observability. Runs entirely locally — no GCP credentials required.
+
+> **Speech-to-speech vs. cascade.** This is the S2S architecture. Its sibling project,
+> `advance-customer-support-agent-feature-A2A-MCP-ADK_cascading`, does the same task as a
+> STT → text-pipeline → TTS cascade with a full pre-agent security gate. They share tools,
+> DB, and memory so you can benchmark the two head-to-head — see `benchmarking_voice_agents/`.
 
 ## Prerequisites
 
@@ -15,8 +32,7 @@ Multi-agent customer support CLI built with Google ADK, MCP Toolbox, A2A securit
 ## 1 — Clone / Unzip
 
 ```bash
-unzip advance-customer-support-agent.zip
-cd advance-customer-support-agent-feature-A2A-MCP-ADK
+cd advance-customer-support-agent-feature-A2A-MCP-ADK-s2s
 ```
 
 ---
@@ -169,8 +185,13 @@ drops you straight into the agent CLI. From the project root:
 
 ```bash
 ./run.sh            # PostgreSQL → MCP Toolbox → A2A servers → agent CLI
-./run.sh web        # same stack, but a Perplexity-style web UI at http://127.0.0.1:8000
+./run.sh web        # same stack, but a Perplexity-style (text) web UI at http://127.0.0.1:8000
+./run.sh voice      # same stack + the real-time speech-to-speech UI at http://127.0.0.1:8001
 ```
+
+> **Voice** is the whole point here: run `./run.sh voice`, open http://127.0.0.1:8001, and
+> talk. Audio streams to Gemini Live and back in real time; the A2A Judge runs on the
+> transcript post-hoc (see the security note above).
 
 It health-checks each service before launching the next, and tears the background services
 down automatically when you exit the CLI (Ctrl-C). Other subcommands:

@@ -1,6 +1,17 @@
-# Customer Support Agent — Quick Start
+# Customer Support Voice Agent — Cascade (STT → Pipeline → TTS)
 
-Multi-agent customer support CLI built with Google ADK, MCP Toolbox, A2A security microservices, Mem0 memory, and Arize Phoenix observability. Runs entirely locally — no GCP credentials required.
+A **cascade** voice agent: speech is transcribed (STT), run through the *untouched* text
+pipeline — **sanitize → A2A Security Judge → ADK agent (+MCP tools, Mem0) → A2A Masker** —
+and the answer is streamed back as speech (TTS). Every stage is separately owned, swappable,
+and fully observable; the security Judge gates the transcript *before* the agent ever sees it.
+
+Built with Google ADK, MCP Toolbox, A2A security microservices, Mem0 memory, and Arize
+Phoenix observability. Runs entirely locally — no GCP credentials required.
+
+> **Cascade vs. speech-to-speech.** This is the cascade architecture. Its sibling project,
+> `advance-customer-support-agent-feature-A2A-MCP-ADK-s2s`, does the same task with native
+> speech-to-speech (Gemini Live). They share tools, DB, and memory so you can benchmark the
+> two head-to-head — see `benchmarking_voice_agents/`.
 
 ## Prerequisites
 
@@ -15,8 +26,7 @@ Multi-agent customer support CLI built with Google ADK, MCP Toolbox, A2A securit
 ## 1 — Clone / Unzip
 
 ```bash
-unzip advance-customer-support-agent.zip
-cd advance-customer-support-agent-feature-A2A-MCP-ADK
+cd advance-customer-support-agent-feature-A2A-MCP-ADK_cascading
 ```
 
 ---
@@ -169,8 +179,13 @@ drops you straight into the agent CLI. From the project root:
 
 ```bash
 ./run.sh            # PostgreSQL → MCP Toolbox → A2A servers → agent CLI
-./run.sh web        # same stack, but a Perplexity-style web UI at http://127.0.0.1:8000
+./run.sh web        # same stack + web UI (with the voice mic button) at http://127.0.0.1:8000
 ```
+
+> **Voice** in the cascade lives in the web UI: run `./run.sh web`, open
+> http://127.0.0.1:8000, and click the mic button. Each spoken turn goes STT → the same
+> `sanitize → Judge → agent → Masker` pipeline → streamed TTS, with per-stage timing and
+> cost shown in the UI.
 
 It health-checks each service before launching the next, and tears the background services
 down automatically when you exit the CLI (Ctrl-C). Other subcommands:
