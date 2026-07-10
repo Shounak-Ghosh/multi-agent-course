@@ -10,6 +10,7 @@ import os
 import sys
 import threading
 import warnings
+from io import BytesIO
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -89,6 +90,36 @@ def _agent_reply(text: str) -> dict:
     }
 
 
+def _voice_agent_reply(audio: bytes, content_type: str) -> dict:
+    with _agent_lock:
+        agent = _get_agent()
+        if getattr(agent.provider, "name", "") == "mock":
+            transcript = agent.provider.transcribe(b"")
+        else:
+            audio_file = BytesIO(audio)
+            if "mp4" in content_type:
+                audio_file.name = "caller.mp4"
+            elif "ogg" in content_type:
+                audio_file.name = "caller.ogg"
+            else:
+                audio_file.name = "caller.webm"
+            stt = agent.provider.client.audio.transcriptions.create(
+                model=agent.provider.stt_model,
+                file=audio_file,
+                response_format="text",
+            )
+            transcript = (stt if isinstance(stt, str) else stt.text).strip()
+        reply, action = agent.respond(transcript)
+    return {
+        "transcript": transcript,
+        "reply": reply,
+        "action": action,
+        "provider": getattr(agent.provider, "name", _agent_provider_name()),
+        "model": getattr(agent.provider, "llm_model", "unknown"),
+        "sttModel": getattr(agent.provider, "stt_model", "unknown"),
+    }
+
+
 def _token(identity: str, name: str, room: str) -> str:
     if _livekit_api_secret() == "secret":
         warnings.filterwarnings("ignore", category=jwt.InsecureKeyLengthWarning)
@@ -141,6 +172,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
+        if parsed.path == "/voice-agent":
+            return self._handle_voice_agent()
         if parsed.path != "/agent":
             self.send_error(404, "File not found")
             return
@@ -153,6 +186,18 @@ class Handler(SimpleHTTPRequestHandler):
             if not text:
                 raise ValueError("Missing text")
             response = _agent_reply(text)
+        except Exception as exc:
+            self._send_json({"error": str(exc)}, status=500)
+            return
+        self._send_json(response)
+
+    def _handle_voice_agent(self) -> None:
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            audio = self.rfile.read(length)
+            if not audio:
+                raise ValueError("Missing audio")
+            response = _voice_agent_reply(audio, self.headers.get("Content-Type", ""))
         except Exception as exc:
             self._send_json({"error": str(exc)}, status=500)
             return

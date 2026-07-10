@@ -343,8 +343,8 @@ python talk_server.py
 ```
 
 Open `http://localhost:5173`. Click `Join caller`, then `Join agent`, and allow
-microphone access when the browser asks. Use the Conversation panel to send hotel
-booking messages to the provider-backed agent.
+microphone access when the browser asks. Click `Talk to agent`, speak a hotel
+booking request, then click `Stop and send`.
 
 Conceptually:
 

@@ -283,6 +283,36 @@ input:focus {
   text-transform: uppercase;
 }
 
+.voice-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.voice-button {
+  min-height: 48px;
+  padding: 0 18px;
+  background: #14835d;
+  border-color: #14835d;
+}
+
+.voice-button.listening {
+  background: #b02f2f;
+  border-color: #b02f2f;
+}
+
+.voice-status {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  border: 1px solid #e4e8ef;
+  border-radius: 6px;
+  padding: 0 12px;
+  color: #596274;
+  background: #ffffff;
+}
+
 .composer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
@@ -307,7 +337,8 @@ input:focus {
   }
 
   .conversation-top,
-  .composer {
+  .composer,
+  .voice-row {
     grid-template-columns: 1fr;
   }
 

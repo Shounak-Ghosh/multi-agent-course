@@ -6,7 +6,12 @@ const transcriptEl = document.querySelector("#transcript");
 const formEl = document.querySelector("#agent-form");
 const messageEl = document.querySelector("#caller-message");
 const speakToggleEl = document.querySelector("#speak-toggle");
+const voiceAgentEl = document.querySelector("#voice-agent");
+const voiceStatusEl = document.querySelector("#voice-status");
 let speakReplies = true;
+let recorder = null;
+let recordedChunks = [];
+let recordingStream = null;
 
 const clients = {
   caller: {
@@ -93,6 +98,7 @@ function addTranscript(role, text, meta = "") {
   item.append(label, body);
   transcriptEl.appendChild(item);
   transcriptEl.scrollTop = transcriptEl.scrollHeight;
+  return item;
 }
 
 function speak(text) {
@@ -102,6 +108,108 @@ function speak(text) {
   utterance.rate = 0.96;
   utterance.pitch = 1.02;
   window.speechSynthesis.speak(utterance);
+}
+
+async function sendToAgent(text) {
+  addTranscript("caller", text);
+  const pending = document.createElement("div");
+  pending.className = "bubble agent pending";
+  pending.textContent = "Aurora Agent is thinking...";
+  transcriptEl.appendChild(pending);
+  transcriptEl.scrollTop = transcriptEl.scrollHeight;
+
+  try {
+    const response = await fetch("/agent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    const payload = await response.json();
+    pending.remove();
+    if (!response.ok) {
+      throw new Error(payload.error || `Agent request failed: ${response.status}`);
+    }
+    providerEl.textContent = `Provider: ${payload.provider} · ${payload.model}`;
+    addTranscript("agent", payload.reply, payload.action ? `action: ${payload.action}` : "");
+    speak(payload.reply);
+  } catch (error) {
+    pending.remove();
+    addTranscript("agent", error.message);
+  }
+}
+
+async function sendAudioToAgent(audioBlob) {
+  const voicePlaceholder = addTranscript("caller", "Voice message", "transcribing");
+  const pending = document.createElement("div");
+  pending.className = "bubble agent pending";
+  pending.textContent = "Aurora Agent is listening...";
+  transcriptEl.appendChild(pending);
+  transcriptEl.scrollTop = transcriptEl.scrollHeight;
+
+  try {
+    const response = await fetch("/voice-agent", {
+      method: "POST",
+      headers: { "Content-Type": audioBlob.type || "audio/webm" },
+      body: audioBlob,
+    });
+    const payload = await response.json();
+    pending.remove();
+    if (!response.ok) {
+      throw new Error(payload.error || `Voice request failed: ${response.status}`);
+    }
+    voicePlaceholder.remove();
+    addTranscript("caller", payload.transcript, payload.sttModel ? `STT: ${payload.sttModel}` : "");
+    providerEl.textContent = `Provider: ${payload.provider} · ${payload.model}`;
+    addTranscript("agent", payload.reply, payload.action ? `action: ${payload.action}` : "");
+    speak(payload.reply);
+  } catch (error) {
+    pending.remove();
+    addTranscript("agent", error.message);
+  }
+}
+
+function stopRecording() {
+  if (recorder && recorder.state !== "inactive") {
+    recorder.stop();
+  }
+}
+
+async function startRecording() {
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+    voiceAgentEl.disabled = true;
+    voiceStatusEl.textContent = "Audio recording is not available in this browser";
+    return;
+  }
+
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+
+  recordingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  recordedChunks = [];
+  recorder = new MediaRecorder(recordingStream);
+  recorder.ondataavailable = (event) => {
+    if (event.data.size > 0) {
+      recordedChunks.push(event.data);
+    }
+  };
+  recorder.onstop = () => {
+    const audioBlob = new Blob(recordedChunks, { type: recorder.mimeType || "audio/webm" });
+    recordingStream.getTracks().forEach((track) => track.stop());
+    recordingStream = null;
+    recorder = null;
+    voiceAgentEl.textContent = "Talk to agent";
+    voiceAgentEl.classList.remove("listening");
+    voiceStatusEl.textContent = "Transcribing...";
+    sendAudioToAgent(audioBlob).finally(() => {
+      voiceStatusEl.textContent = "Ready";
+    });
+  };
+
+  recorder.start();
+  voiceAgentEl.textContent = "Stop and send";
+  voiceAgentEl.classList.add("listening");
+  voiceStatusEl.textContent = "Recording. Speak, then click Stop and send.";
 }
 
 async function loadState() {
@@ -189,31 +297,7 @@ formEl.addEventListener("submit", async (event) => {
   if (!text) return;
 
   messageEl.value = "";
-  addTranscript("caller", text);
-  const pending = document.createElement("div");
-  pending.className = "bubble agent pending";
-  pending.textContent = "Aurora Agent is thinking...";
-  transcriptEl.appendChild(pending);
-  transcriptEl.scrollTop = transcriptEl.scrollHeight;
-
-  try {
-    const response = await fetch("/agent", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-    });
-    const payload = await response.json();
-    pending.remove();
-    if (!response.ok) {
-      throw new Error(payload.error || `Agent request failed: ${response.status}`);
-    }
-    providerEl.textContent = `Provider: ${payload.provider} · ${payload.model}`;
-    addTranscript("agent", payload.reply, payload.action ? `action: ${payload.action}` : "");
-    speak(payload.reply);
-  } catch (error) {
-    pending.remove();
-    addTranscript("agent", error.message);
-  }
+  sendToAgent(text);
 });
 
 speakToggleEl.addEventListener("click", () => {
@@ -222,6 +306,18 @@ speakToggleEl.addEventListener("click", () => {
   if (!speakReplies && "speechSynthesis" in window) {
     window.speechSynthesis.cancel();
   }
+});
+
+voiceAgentEl.addEventListener("click", () => {
+  if (recorder && recorder.state === "recording") {
+    stopRecording();
+    return;
+  }
+  startRecording().catch((error) => {
+    voiceAgentEl.textContent = "Talk to agent";
+    voiceAgentEl.classList.remove("listening");
+    voiceStatusEl.textContent = error.message;
+  });
 });
 
 loadState();

@@ -81,14 +81,18 @@
           <div class="room-pill" id="provider">Provider: loading</div>
         </div>
         <div id="transcript" class="transcript" aria-live="polite">
-          <div class="empty">Send a caller message to see the hotel agent respond.</div>
+          <div class="empty">Press Talk to agent and ask about hotel availability or booking.</div>
+        </div>
+        <div class="voice-row">
+          <button id="voice-agent" type="button" class="voice-button">Talk to agent</button>
+          <span id="voice-status" class="voice-status">Ready</span>
         </div>
         <form id="agent-form" class="composer">
           <input
             id="caller-message"
             type="text"
             autocomplete="off"
-            placeholder="Ask about hotel availability or booking"
+            placeholder="Typed fallback"
           />
           <button type="submit">Send to agent</button>
           <button id="speak-toggle" type="button" class="secondary">Speak replies on</button>
