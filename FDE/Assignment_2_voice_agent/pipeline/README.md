@@ -1,4 +1,4 @@
-# Pipeline — Hands-On Voice Loop (Layer A + B)
+# Pipeline  -  Hands-On Voice Loop (Layer A + B)
 
 The part attendees build/run live. A terminal voice agent:
 
@@ -6,7 +6,7 @@ The part attendees build/run live. A terminal voice agent:
   mic  →  VAD  →  STT  →  LLM agent (+tools)  →  TTS  →  speakers
 ```
 
-No phone, no SIP — just your laptop mic. Telephony is covered by `../mocks/`.
+No phone, no SIP  -  just your laptop mic. Telephony is covered by `../mocks/`.
 
 ## Provider: one adaptor, two backends (Groq / OpenAI)
 
@@ -18,10 +18,10 @@ names default sensibly per provider.
 |-------|------------------|-------------------|
 | LLM | `llama-3.3-70b-versatile` | `gpt-4o-mini` |
 | STT | `whisper-large-v3-turbo` | `whisper-1` |
-| TTS | `playai-tts` *(preview — accept terms)* | `tts-1` |
+| TTS | `playai-tts` *(preview  -  accept terms)* | `tts-1` |
 
 **Recommended for the workshop:** `PROVIDER=groq` (free + fast). If Groq TTS gives you
-trouble, set `TTS_BACKEND=system` to use a local voice command — the demo keeps working
+trouble, set `TTS_BACKEND=system` to use a local voice command  -  the demo keeps working
 at zero cost. Switching to OpenAI later is just `PROVIDER=openai` + your key.
 
 For a more natural OpenAI voice, use:
@@ -33,7 +33,7 @@ TTS_VOICE=marin
 TTS_INSTRUCTIONS=Speak warmly and naturally, like a calm support representative.
 ```
 
-> Avoid the OpenAI **Realtime** API for this — it's ~10–20× the price. The pipeline here keeps
+> Avoid the OpenAI **Realtime** API for this  -  it's ~10–20× the price. The pipeline here keeps
 > STT/LLM/TTS separate, which is both cheaper *and* what you want pedagogically (each stage is
 > visible and individually timed).
 
@@ -53,7 +53,7 @@ cp config.example.env .env      # set PROVIDER + the matching API key
 ## Test it with no network (offline mock)
 
 There's a third backend, `PROVIDER=mock`, that returns scripted STT/LLM/TTS with **no key,
-no network, and no SDK installed** — the same interface as Groq/OpenAI, so it exercises the
+no network, and no SDK installed**  -  the same interface as Groq/OpenAI, so it exercises the
 real loop and tool calls. Use it for rehearsals, CI, or a projector that has no internet.
 
 ```bash
@@ -69,7 +69,7 @@ and hangup paths. Green here means the wiring is correct before you ever add a k
 
 ```bash
 python voice_loop.py          # real mic (VAD endpointing + STT + TTS)
-python voice_loop.py --text   # type your turn — needs NO audio libs, NO mic
+python voice_loop.py --text   # type your turn  -  needs NO audio libs, NO mic
 ```
 
 `--text` mode still uses the real LLM + tools over your chosen provider, so it's the
@@ -80,9 +80,9 @@ per-stage latency breakdown (stt / llm+tools / tts) against the ~800 ms target.
 
 | File | Role |
 |------|------|
-| `providers.py` | The adaptor — Groq/OpenAI via the OpenAI SDK. `chat` / `transcribe` / `synthesize`. |
-| `agent.py` | The brain — system prompt + hotel tools (`check_availability`, `create_booking`, `transfer_to_human`, `end_call`) via OpenAI-style tool calling. |
-| `voice_loop.py` | The loop — VAD endpointing, STT, agent turn, TTS playback, latency timing, `--text` mode. |
+| `providers.py` | The adaptor  -  Groq/OpenAI via the OpenAI SDK. `chat` / `transcribe` / `synthesize`. |
+| `agent.py` | The brain  -  system prompt + hotel tools (`check_availability`, `create_booking`, `transfer_to_human`, `end_call`) via OpenAI-style tool calling. |
+| `voice_loop.py` | The loop  -  VAD endpointing, STT, agent turn, TTS playback, latency timing, `--text` mode. |
 
 Try: *"I need a room from August 12 to August 14 for two guests."* → watch
 `check_availability` fire and the agent offer room options. Then say
@@ -93,10 +93,10 @@ Try: *"I need a room from August 12 to August 14 for two guests."* → watch
 
 1. **Layer A:** ask for a room, hear it answer. "We have a voice agent."
 2. **Layer B:** "I need a room for two guests..." → `check_availability` fires in the logs.
-3. **Latency:** point at the per-turn breakdown — the LLM stage dominates; that's why a fast
+3. **Latency:** point at the per-turn breakdown  -  the LLM stage dominates; that's why a fast
    model (Groq) matters.
-4. **Hand-off:** "Now — how does a real phone call get here?" → open `../mocks/`.
+4. **Hand-off:** "Now  -  how does a real phone call get here?" → open `../mocks/`.
 
 ## Budget check
 On Groq's free tier the whole workshop is **$0**. If you fall back to OpenAI: pipeline STT+LLM+TTS
-≈ **~$1–2** for a full session — comfortably under $10.
+≈ **~$1–2** for a full session  -  comfortably under $10.

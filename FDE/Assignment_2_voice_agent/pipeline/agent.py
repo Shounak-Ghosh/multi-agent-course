@@ -1,5 +1,5 @@
 """
-agent.py — the "brain" (Layer B). LLM + tool loop over a Provider.
+agent.py  -  the "brain" (Layer B). LLM + tool loop over a Provider.
 
 Tools mirror a hotel reservations desk:
     check_availability -> find matching rooms
@@ -8,7 +8,7 @@ Tools mirror a hotel reservations desk:
     end_call           -> caller done (real system: SIP BYE)
 
 Uses OpenAI-style function calling, which both Groq and OpenAI support, so this
-file is provider-agnostic — it only talks to Provider.chat().
+file is provider-agnostic  -  it only talks to Provider.chat().
 """
 
 from __future__ import annotations

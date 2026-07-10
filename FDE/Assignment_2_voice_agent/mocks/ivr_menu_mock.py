@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Fake IVR menu — Layer C demo, no telephony required.
+Fake IVR menu  -  Layer C demo, no telephony required.
 
 Simulates a caller giving input by DTMF keypress ("1") OR natural speech
 ("I need a room"), routes to the matching branch, and prints which
@@ -25,7 +25,7 @@ BRANCHES = {
         "keys": {"1"},
         "phrases": ("book", "room", "reservation", "stay", "availability", "guests"),
         "tool": "check_availability(check_in, check_out, guests)",
-        "say": "Sure — what dates and how many guests?",
+        "say": "Sure  -  what dates and how many guests?",
     },
     "change": {
         "keys": {"2"},
@@ -43,7 +43,7 @@ BRANCHES = {
         "keys": {"0"},
         "phrases": ("human", "agent", "person", "representative", "someone"),
         "tool": "transfer_to_human()  → SIP REFER to front-desk",
-        "say": "No problem — connecting you to the front desk now.",
+        "say": "No problem  -  connecting you to the front desk now.",
     },
 }
 
@@ -94,7 +94,7 @@ def main():
         if branch["tool"]:
             print(f"  TOOL FIRES: {branch['tool']}")
         else:
-            print("  (answered inline — no tool call)")
+            print("  (answered inline  -  no tool call)")
         print()
 
 

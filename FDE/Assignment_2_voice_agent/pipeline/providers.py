@@ -1,7 +1,7 @@
 """
-providers.py — one adaptor, two backends: Groq and OpenAI.
+providers.py  -  one adaptor, two backends: Groq and OpenAI.
 
-Groq speaks the OpenAI API dialect, so a single code path covers both — only
+Groq speaks the OpenAI API dialect, so a single code path covers both  -  only
 base_url, api_key, and model names differ. Switch with PROVIDER=groq|openai in
 .env; move to your OpenAI key later by flipping that one value.
 
@@ -196,7 +196,7 @@ class MockProvider:
         return _mk_text("I can help with hotel reservations only. Would you like to book, change, or cancel a stay?")
 
     def transcribe(self, pcm_int16: bytes, sample_rate: int = 16000) -> str:
-        """No offline STT — return the next scripted phrase (rehearsal mode)."""
+        """No offline STT  -  return the next scripted phrase (rehearsal mode)."""
         phrase = self._stt_script[self._stt_i % len(self._stt_script)]
         self._stt_i += 1
         return phrase

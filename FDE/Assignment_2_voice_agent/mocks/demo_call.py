@@ -1,11 +1,11 @@
 """
-demo_call.py — a FULL end-to-end simulated inbound phone call, offline.
+demo_call.py  -  a FULL end-to-end simulated inbound phone call, offline.
 
 Ties Layer C (SIP signaling) to Layer A/B (the agent loop). Prints the SIP
 INVITE/200/ACK handshake, runs a scripted caller conversation through the REAL
 Agent on the mock provider (no network/key), shows tools + RTP audio markers,
 then tears the call down with BYE (or REFER on a transfer). Nothing here dials a
-real phone — it's the "watch a whole call happen" demo for the SIP segment.
+real phone  -  it's the "watch a whole call happen" demo for the SIP segment.
 
     python demo_call.py            # hotel booking -> caller hangs up (BYE)
     python demo_call.py --transfer # caller asks for a human -> REFER

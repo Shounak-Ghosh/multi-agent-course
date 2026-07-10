@@ -1,4 +1,4 @@
-# SIP / IVR Call Flow — Mocks
+# SIP / IVR Call Flow  -  Mocks
 
 Layer C of the workshop. **Nothing here requires a carrier, a phone number, or a SIP trunk.**
 It's sample payloads + diagrams so people understand how a real phone call becomes the audio
@@ -12,7 +12,7 @@ A phone call is **two separate things** on the wire:
 
 | | **SIP** (Session Initiation Protocol) | **RTP** (Real-time Transport Protocol) |
 |---|---|---|
-| Job | *Signaling* — set up, change, tear down the call | *Media* — carry the actual audio packets |
+| Job | *Signaling*  -  set up, change, tear down the call | *Media*  -  carry the actual audio packets |
 | Analogy | The waiter taking your order | The food being carried to the table |
 | Payload | Text messages (INVITE, 200 OK, BYE…) | Encoded audio frames (e.g. G.711 / Opus), ~every 20 ms |
 | Port | Usually 5060/5061 | Negotiated dynamically (see SDP below) |
@@ -59,7 +59,7 @@ the *right* of the media server.
 ## 3. Annotated SIP call setup (sample messages)
 
 A normal successful call is the **INVITE / 200 OK / ACK … BYE** dance. These are real-shaped
-SIP messages with fake identifiers — safe to show on a slide.
+SIP messages with fake identifiers  -  safe to show on a slide.
 
 ### 3.1 Caller → agent: `INVITE` (I want to start a call)
 
@@ -86,7 +86,7 @@ a=rtpmap:8 PCMA/8000                  ←   G.711 A-law,
 a=rtpmap:96 opus/48000/2              ←   Opus
 ```
 
-- The **`m=` and `a=rtpmap` lines are SDP** (Session Description Protocol) — the offer of
+- The **`m=` and `a=rtpmap` lines are SDP** (Session Description Protocol)  -  the offer of
   *what audio, which codecs, which port*. This is how RTP gets negotiated.
 - `Call-ID` uniquely identifies this call for its whole life. Great correlation key for logs.
 
@@ -164,18 +164,18 @@ SIP/2.0 200 OK        ← call torn down, RTP stops, log final transcript + dura
 ```
 
 `═══` = media (RTP/audio), `───` = signaling/control. Note media and signaling are
-**different arrows** — that's the whole point of Section 1.
+**different arrows**  -  that's the whole point of Section 1.
 
 ---
 
-## 5. IVR — the menu layer on top
+## 5. IVR  -  the menu layer on top
 
 **IVR (Interactive Voice Response)** is the "press 1 to book a room" logic. Two ways the caller
 gives input:
 
-1. **DTMF** — the beep tones from pressing keypad digits (carried as RFC 2833 events, not
+1. **DTMF**  -  the beep tones from pressing keypad digits (carried as RFC 2833 events, not
    audio you transcribe).
-2. **Speech** — "I need a room for two guests" → STT → intent. Modern voice agents lean on
+2. **Speech**  -  "I need a room for two guests" → STT → intent. Modern voice agents lean on
    this; DTMF is the reliable fallback.
 
 ### A sample IVR intent tree
@@ -190,7 +190,7 @@ gives input:
    ├─ "change"    / press 2 ─▶ Front desk flow     ─▶ (tool: transfer_to_human)
    ├─ "hours"     / press 3 ─▶ Play front desk hours, then re-prompt
    ├─ "agent"/"human" / 0   ─▶ transfer_to_human  ─▶ SIP REFER / warm transfer
-   └─ (no match ×2)         ─▶ transfer_to_human   (safety net — never dead-end a caller)
+   └─ (no match ×2)         ─▶ transfer_to_human   (safety net  -  never dead-end a caller)
 ```
 
 ### How this maps to the agent's tools
@@ -204,7 +204,7 @@ The LLM agent from Layer B exposes exactly these as tools:
 | human / 0 | `transfer_to_human()` | Signals telephony to **SIP REFER** the call to a queue |
 | hang up | `end_call()` | Agent triggers `BYE` |
 
-So the "IVR menu" isn't a separate rigid tree in a modern agent — it's the **system prompt +
+So the "IVR menu" isn't a separate rigid tree in a modern agent  -  it's the **system prompt +
 tools**. The mock tree above is what product/ops people expect to see; show it, then show
 that the agent achieves the same thing more flexibly.
 
@@ -225,7 +225,7 @@ Say out loud: **"transfer to human is the correct error handler for a voice agen
 
 ## 6. Run the mocks (no telephony required)
 
-**Watch a whole call end to end** — SIP handshake → agent turns → tool call → teardown — all
+**Watch a whole call end to end**  -  SIP handshake → agent turns → tool call → teardown  -  all
 offline, driving the real `Agent`:
 
 ```bash
@@ -233,7 +233,7 @@ python demo_call.py             # balance lookup, caller hangs up (SIP BYE)
 python demo_call.py --transfer  # caller asks for a human (SIP REFER)
 ```
 
-**Interactive IVR menu** — simulate DTMF/speech input and see which agent tool would fire:
+**Interactive IVR menu**  -  simulate DTMF/speech input and see which agent tool would fire:
 
 ```bash
 python ivr_menu_mock.py
@@ -253,7 +253,7 @@ provider, so no key/network).
 | **SIP** | Text protocol that sets up / tears down calls (signaling) |
 | **RTP** | Carries the actual audio packets in real time |
 | **SDP** | The "offer/answer" inside SIP that negotiates codec + ports for RTP |
-| **SBC** | Session Border Controller — the security/edge gateway for SIP |
+| **SBC** | Session Border Controller  -  the security/edge gateway for SIP |
 | **SIP trunk** | The connection from a carrier that delivers phone calls to you |
 | **DTMF** | Keypad tones ("press 1"), sent as events not audio |
 | **Codec** | Audio compression (G.711 = simple/telephone, Opus = modern/wideband) |

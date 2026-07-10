@@ -1,5 +1,5 @@
 """
-smoke_test.py — full offline end-to-end check. No network, no key, no mic.
+smoke_test.py  -  full offline end-to-end check. No network, no key, no mic.
 
 Forces PROVIDER=mock and drives scripted turns through the REAL Agent + adaptor,
 asserting that tools fire and control actions (transfer/hangup) surface. Run
@@ -29,9 +29,9 @@ def main() -> None:
         if action:
             print(f"[action: {action}]")
         if expect_action and action != expect_action:
-            print(f"  ✗ expected action {expect_action!r}, got {action!r}"); ok = False
+            print(f"   expected action {expect_action!r}, got {action!r}"); ok = False
         if expect_in and expect_in.lower() not in reply.lower():
-            print(f"  ✗ expected {expect_in!r} in reply"); ok = False
+            print(f"   expected {expect_in!r} in reply"); ok = False
         print()
 
     # Guardrail path -> off-topic redirect
@@ -55,9 +55,9 @@ def main() -> None:
     reply, action = agent2.respond("Goodbye")
     print(f"you>   Goodbye\nagent> {reply}\n[action: {action}]\n")
     if action != "hangup":
-        print(f"  ✗ expected hangup, got {action!r}"); ok = False
+        print(f"   expected hangup, got {action!r}"); ok = False
 
-    print("RESULT:", "PASS ✓" if ok else "FAIL ✗")
+    print("RESULT:", "PASS" if ok else "FAIL")
     raise SystemExit(0 if ok else 1)
 
 

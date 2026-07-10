@@ -1,8 +1,8 @@
-# Runbook — Follow Along End to End
+# Runbook  -  Follow Along End to End
 
 Everything you need to run this project from scratch, with the **real output of each command**
-so you know exactly what "working" looks like. All the steps in **Part 1 run fully offline** —
-no API key, no network, no `pip install`. Parts 2–3 add live speech.
+so you know exactly what "working" looks like. All the steps in **Part 1 run fully offline**.
+No API key, network access, or `pip install` is required. Parts 2-3 add live speech.
 
 > New here? Read [`README.md`](README.md) for the concept and [`WORKSHOP_SCRIPT.md`](WORKSHOP_SCRIPT.md)
 > for the 90-minute run-of-show. This file is just "type these commands, see this output."
@@ -18,7 +18,7 @@ There are **three provider modes**, all behind the same code:
 | Mode | Needs | For |
 |------|-------|-----|
 | `mock` | nothing (offline) | rehearsal, tests, the SIP call demo, live fallback |
-| `groq` | free key | the real "talk to a bot" demo — $0 on free tier |
+| `groq` | free key | the real "talk to a bot" demo  -  $0 on free tier |
 | `openai` | your key | fallback / if you prefer OpenAI (~$1–2 total) |
 
 ---
@@ -53,7 +53,7 @@ voice-agent-workshop/
 
 ---
 
-## Part 1 — Run everything offline (no key, no install)
+## Part 1  -  Run everything offline (no key, no install)
 
 Start here. This proves the whole system works before you touch a provider.
 
@@ -61,7 +61,7 @@ Start here. This proves the whole system works before you touch a provider.
 cd voice-agent-workshop
 ```
 
-### 1a. Sanity check — the automated end-to-end test
+### 1a. Sanity check  -  the automated end-to-end test
 
 ```bash
 cd pipeline
@@ -88,11 +88,11 @@ you>   Goodbye
 agent> Ending the call.
 [action: hangup]
 
-RESULT: PASS ✓
+RESULT: PASS
 ```
 
-`PASS ✓` means the loop, the tool calls, and the transfer/hangup control signals are all wired
-correctly. This runs the **real** `Agent` — only the provider is mocked.
+`PASS` means the loop, the tool calls, and the transfer/hangup control signals are all wired
+correctly. This runs the **real** `Agent`  -  only the provider is mocked.
 
 ### 1b. Talk to the agent yourself (typed, offline)
 
@@ -122,12 +122,12 @@ you> agent> Transferring you to the front desk.
     tts               0 ms
     TOTAL             0 ms  (target < ~800 ms)
 
-[transferring to front desk — SIP REFER to front-desk]
+[transferring to front desk  -  SIP REFER to front-desk]
 ```
 
-(Latencies are ~0 ms because the mock is instant — on Groq you'll see real milliseconds here.)
+(Latencies are ~0 ms because the mock is instant  -  on Groq you'll see real milliseconds here.)
 
-### 1c. Watch a full phone call — SIP handshake to teardown
+### 1c. Watch a full phone call  -  SIP handshake to teardown
 
 ```bash
 cd ../mocks
@@ -212,27 +212,27 @@ Thanks for calling Aurora Hotel. Tell me what you need, or press a key:
   0 or 'human'    → talk to the front desk
 
 caller>   → branch: booking
-  agent says: Sure — what dates and how many guests?
+  agent says: Sure  -  what dates and how many guests?
   TOOL FIRES: check_availability(check_in, check_out, guests)
 
 caller>   → branch: hours
   agent says: We're open 9am to 6pm, Monday through Friday. Anything else?
-  (answered inline — no tool call)
+  (answered inline  -  no tool call)
 
 caller>   → branch: human
-  agent says: No problem — connecting you to a representative now.
+  agent says: No problem  -  connecting you to a representative now.
   TOOL FIRES: transfer_to_human()  → SIP REFER to front-desk
 ```
 
 > Note: routing is first-match-by-keyword, so an ambiguous phrase like "change my room"
 > resolves to **booking** if "room" appears first in the branch checks. Fine for the demo.
 
-✅ **If all of Part 1 printed the output above, the system is verified.** Everything past here
+**If all of Part 1 printed the output above, the system is verified.** Everything past here
 just swaps the mock for real speech.
 
 ---
 
-## Part 2 — Install for live speech
+## Part 2  -  Install for live speech
 
 ```bash
 cd ../pipeline
@@ -260,9 +260,9 @@ GROQ_API_KEY=<your free key from console.groq.com>
 
 ---
 
-## Part 3 — Run live
+## Part 3  -  Run live
 
-Typed input against the real Groq LLM + tools (no mic needed — good first live check):
+Typed input against the real Groq LLM + tools (no mic needed  -  good first live check):
 
 ```bash
 python3 voice_loop.py --text
@@ -275,7 +275,7 @@ python3 voice_loop.py
 ```
 
 Speak, pause, and the agent replies. The per-turn latency table now shows **real** stt /
-llm+tools / tts milliseconds — point out that the LLM stage dominates the ~800 ms budget.
+llm+tools / tts milliseconds  -  point out that the LLM stage dominates the ~800 ms budget.
 
 Switch to OpenAI any time by editing `.env`:
 
@@ -284,7 +284,7 @@ PROVIDER=openai
 OPENAI_API_KEY=<your key>
 ```
 
-Nothing else changes — same commands, same loop.
+Nothing else changes  -  same commands, same loop.
 
 ---
 
@@ -293,19 +293,19 @@ Nothing else changes — same commands, same loop.
 | Symptom | Fix |
 |---------|-----|
 | `RuntimeError: Set GROQ_API_KEY…` | Add the key to `.env`, or run with `PROVIDER=mock` |
-| `ModuleNotFoundError: openai` | You're live without installing — `pip install -r requirements.txt`, or use `PROVIDER=mock` (needs nothing) |
+| `ModuleNotFoundError: openai` | You're live without installing  -  `pip install -r requirements.txt`, or use `PROVIDER=mock` (needs nothing) |
 | `sounddevice`/PortAudio error | `brew install portaudio`, or use `--text` mode |
 | Groq TTS error / no audio | Accept model terms in the Groq console, or set `TTS_BACKEND=system` |
 | Mic doesn't capture | Grant terminal microphone permission, or use `--text` |
 | Everything feels slow | Try `LLM_MODEL=llama-3.1-8b-instant` in `.env` (faster, weaker tool use) |
-| Live services down mid-demo | `PROVIDER=mock` — the whole thing runs offline instantly |
+| Live services down mid-demo | `PROVIDER=mock`  -  the whole thing runs offline instantly |
 
 ---
 
 ## What's been verified vs. what needs your machine
 
-- ✅ **Verified offline** (Part 1): `smoke_test.py`, `voice_loop.py --text` (mock), `demo_call.py`
+- **Verified offline** (Part 1): `smoke_test.py`, `voice_loop.py --text` (mock), `demo_call.py`
   (both scenarios), `ivr_menu_mock.py`. Outputs above are the actual captured runs.
-- ⚙️ **Needs your laptop** (Parts 2–3): the `pip install`, a real Groq/OpenAI key, and mic-mode
-  `voice_loop.py`. Do one live run before the workshop — the pre-flight checklist in
+- **Needs your laptop** (Parts 2–3): the `pip install`, a real Groq/OpenAI key, and mic-mode
+  `voice_loop.py`. Do one live run before the workshop  -  the pre-flight checklist in
   `WORKSHOP_SCRIPT.md` covers it.

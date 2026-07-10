@@ -1,5 +1,5 @@
 """
-voice_loop.py — the turn loop (Layer A).
+voice_loop.py  -  the turn loop (Layer A).
 
     mic -> VAD endpointing -> STT -> Agent -> TTS -> speakers
 
@@ -8,7 +8,7 @@ goes. Provider (Groq/OpenAI) is chosen in .env; see providers.py.
 
 Modes:
     python voice_loop.py          # real mic
-    python voice_loop.py --text   # type your turn (no audio deps / no mic) — always works
+    python voice_loop.py --text   # type your turn (no audio deps / no mic)  -  always works
 """
 
 from __future__ import annotations
@@ -69,7 +69,7 @@ def record_utterance() -> bytes:
     started = False
     trailing_silence = 0
 
-    print("  (listening — speak, then pause)")
+    print("  (listening  -  speak, then pause)")
     with sd.RawInputStream(samplerate=SAMPLE_RATE, blocksize=frame_len,
                            dtype="int16", channels=1) as stream:
         while True:
@@ -140,14 +140,14 @@ def run(text_mode: bool) -> None:
             print()
 
             if action == "hangup":
-                print("[call ended — SIP BYE]")
+                print("[call ended  -  SIP BYE]")
                 break
             if action == "transfer":
-                print("[transferring to front desk — SIP REFER to front-desk]")
+                print("[transferring to front desk  -  SIP REFER to front-desk]")
                 break
 
         except (EOFError, KeyboardInterrupt):
-            print("\n[caller hung up — SIP BYE]")
+            print("\n[caller hung up  -  SIP BYE]")
             break
 
 
