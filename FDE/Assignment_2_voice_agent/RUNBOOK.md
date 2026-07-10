@@ -4,8 +4,8 @@ Everything you need to run this project from scratch, with the **real output of 
 so you know exactly what "working" looks like. All the steps in **Part 1 run fully offline**.
 No API key, network access, or `pip install` is required. Parts 2-3 add live speech.
 
-> New here? Read [`README.md`](README.md) for the concept and [`WORKSHOP_SCRIPT.md`](WORKSHOP_SCRIPT.md)
-> for the 90-minute run-of-show. This file is just "type these commands, see this output."
+> New here? Read [`README.md`](README.md) for setup, FDE framing, and the 90-minute plan.
+> This file is just "type these commands, see this output."
 
 The whole thing is one loop:
 
@@ -34,9 +34,8 @@ There are **three provider modes**, all behind the same code:
 ## Directory map
 
 ```
-voice-agent-workshop/
+Assignment_2_voice_agent/
 ├── README.md            ← the plan / concept
-├── WORKSHOP_SCRIPT.md   ← 90-min facilitator script
 ├── RUNBOOK.md           ← this file
 ├── pipeline/            ← the agent + voice loop
 │   ├── providers.py     ← adaptor: groq / openai / mock
@@ -306,6 +305,5 @@ Nothing else changes  -  same commands, same loop.
 
 - **Verified offline** (Part 1): `smoke_test.py`, `voice_loop.py --text` (mock), `demo_call.py`
   (both scenarios), `ivr_menu_mock.py`. Outputs above are the actual captured runs.
-- **Needs your laptop** (Parts 2–3): the `pip install`, a real Groq/OpenAI key, and mic-mode
-  `voice_loop.py`. Do one live run before the workshop  -  the pre-flight checklist in
-  `WORKSHOP_SCRIPT.md` covers it.
+- **Needs your laptop** (Parts 2-3): the `pip install`, a real Groq/OpenAI key, and mic-mode
+  `voice_loop.py`. Do one live run before the session using the setup steps in `README.md`.
