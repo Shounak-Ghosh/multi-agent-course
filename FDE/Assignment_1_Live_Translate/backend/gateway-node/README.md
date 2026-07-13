@@ -16,6 +16,12 @@ cp .env.example .env      # PORT=8787, AI_SERVICE_URL=http://localhost:8000
 npm start                 # or: npm run dev  (auto-restart)
 ```
 
+Stop it (free port 8787 — e.g. a stale server from a previous run):
+
+```bash
+lsof -ti :8787 | xargs kill        # add -9 if it won't die
+```
+
 Start the Python AI service first (port 8000), then this gateway (port 8787).
 
 ## Check it

@@ -21,6 +21,12 @@ cp .env.example .env          # add your API key, pick your MODEL
 uvicorn app:app --reload --port 8000
 ```
 
+Stop it (free port 8000 — e.g. a stale server from a previous run):
+
+```bash
+lsof -ti :8000 | xargs kill        # add -9 if it won't die
+```
+
 Then hit it directly to test without the browser:
 
 ```bash

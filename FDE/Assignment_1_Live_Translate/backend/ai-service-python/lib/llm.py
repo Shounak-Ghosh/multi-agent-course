@@ -19,31 +19,47 @@ assignment (and a real production bug — it ships English while looking healthy
 """
 import os
 
-MODEL_DEFAULT = os.getenv("MODEL", "claude-sonnet-4-6")
+from openai import AsyncOpenAI
+
+MODEL_DEFAULT = os.getenv("MODEL", "gpt-4o-mini")
+
+SYSTEM_PROMPT = (
+    "You are a professional translator. Translate the user's English text into "
+    "natural MEXICAN Spanish (es-MX) — the register spoken in Mexico, not "
+    "Castilian or generic Spanish. Return ONLY the translation — no quotes, no "
+    "notes, no preamble. Keep numbers, prices ($), URLs, and product/model codes "
+    "(e.g. SKU-4471) exactly as they appear."
+)
+
+_client: AsyncOpenAI | None = None
+
+
+def _get_client() -> AsyncOpenAI:
+    # lazy so the key is read after load_dotenv() has run in app.py
+    global _client
+    if _client is None:
+        _client = AsyncOpenAI()  # reads OPENAI_API_KEY
+    return _client
 
 
 async def translate_text(text: str, target: str = "es-MX", model: str = MODEL_DEFAULT) -> str:
-    """Return `text` translated into `target` (Mexican Spanish by default)."""
-    # -----------------------------------------------------------------------
-    # TODO (YOU):
-    #   1. Build a system/user prompt that enforces Mexican Spanish and asks
-    #      for the translation only.
-    #   2. Call your LLM (async if the client supports it).
-    #   3. Clean and return the string.
-    #
-    # --- Example: Anthropic Claude -----------------------------------------
-    # from anthropic import AsyncAnthropic
-    # client = AsyncAnthropic()  # reads ANTHROPIC_API_KEY
-    # msg = await client.messages.create(
-    #     model=model,
-    #     max_tokens=1024,
-    #     system=(
-    #         "You are a professional translator. Translate the user's English text "
-    #         "into natural MEXICAN Spanish (es-MX). Return ONLY the translation — no "
-    #         "quotes, no notes. Keep numbers, prices, and product codes unchanged."
-    #     ),
-    #     messages=[{"role": "user", "content": text}],
-    # )
-    # return msg.content[0].text.strip()
-    # -----------------------------------------------------------------------
-    raise NotImplementedError("Implement translate_text() in lib/llm.py")
+    """Return `text` translated into `target` (Mexican Spanish by default).
+
+    FAIL LOUD: provider errors propagate to the caller (which returns a 502);
+    this function never falls back to returning the untranslated input.
+    """
+    resp = await _get_client().chat.completions.create(
+        model=model,
+        max_tokens=1024,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": f"Translate into {target}:\n{text}"},
+        ],
+    )
+    translated = (resp.choices[0].message.content or "").strip()
+    # strip a matching pair of wrapping quotes the model may add
+    for open_q, close_q in (('"', '"'), ("'", "'"), ("“", "”"), ("«", "»")):
+        if len(translated) >= 2 and translated[0] == open_q and translated[-1] == close_q:
+            translated = translated[1:-1].strip()
+            break
+    return translated

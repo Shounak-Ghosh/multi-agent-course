@@ -16,6 +16,8 @@
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const fs = require("fs");
+const crypto = require("crypto");
 require("dotenv").config();
 
 const PORT = process.env.PORT || 8787;
@@ -29,21 +31,33 @@ const startedAt = Date.now();
 app.use(cors()); // dev: allow every origin so the widget works on any page
 app.use(express.json({ limit: "1mb" }));
 
-/*
- * TODO (YOU) #1 — request logging middleware.
- * Log one line per request AFTER it finishes, including: method, url,
- * status code, and duration in ms. Use res.on("finish", ...) so you can
- * read the final status code and measure elapsed time.
- * Keep it structured enough to grep later.
- *
- * app.use((req, res, next) => {
- *   const t0 = Date.now();
- *   res.on("finish", () => {
- *     // console.log(...method, url, statusCode, Date.now() - t0 + "ms")
- *   });
- *   next();
- * });
- */
+// structured JSON logging — one line per event, to stdout AND gateway.log
+// (same shape as the AI service's lib/logger.py, so traces grep the same way)
+const LOG_FILE = path.join(__dirname, "gateway.log");
+function logLine(event, fields) {
+  const line = JSON.stringify({ ts: new Date().toISOString(), level: "INFO", event, ...fields });
+  console.log(line);
+  fs.appendFile(LOG_FILE, line + "\n", (err) => {
+    if (err) console.error("log write failed:", err.message);
+  });
+}
+
+// request ID + request logging middleware
+app.use((req, res, next) => {
+  req.requestId = req.get("x-request-id") || crypto.randomUUID();
+  res.set("X-Request-Id", req.requestId);
+  const t0 = Date.now();
+  res.on("finish", () => {
+    logLine("request", {
+      requestId: req.requestId,
+      method: req.method,
+      url: req.originalUrl,
+      status: res.statusCode,
+      durationMs: Date.now() - t0,
+    });
+  });
+  next();
+});
 
 // --- serve the widget to the console loader ------------------------------
 app.get("/widget.js", (req, res) => {
@@ -52,17 +66,20 @@ app.get("/widget.js", (req, res) => {
 });
 
 // --- helper: forward a request to the Python AI service ------------------
-/*
- * TODO (YOU) #2 — implement the proxy call.
- * POST `body` as JSON to `${AI_SERVICE_URL}${path}` and return the parsed
- * JSON response. Throw on a non-2xx so callers can turn it into a 502.
- * (Node 18+ has global fetch — no import needed.)
- */
-async function callAiService(path, body) {
-  // const res = await fetch(AI_SERVICE_URL + path, { ... });
-  // if (!res.ok) throw new Error("AI service " + res.status);
-  // return res.json();
-  throw new Error("callAiService not implemented — see TODO (YOU) #2");
+async function callAiService(path, body, requestId) {
+  const res = await fetch(AI_SERVICE_URL + path, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(requestId ? { "x-request-id": requestId } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const detail = (await res.text().catch(() => "")).slice(0, 200);
+    throw new Error(`AI service ${res.status}${detail ? ": " + detail : ""}`);
+  }
+  return res.json();
 }
 
 // --- routes the widget calls ---------------------------------------------
@@ -70,7 +87,7 @@ app.post("/translate", async (req, res) => {
   const { text, target } = req.body || {};
   if (typeof text !== "string") return res.status(400).json({ error: "`text` (string) is required" });
   try {
-    const data = await callAiService("/translate", { text, target: target || "es-MX" });
+    const data = await callAiService("/translate", { text, target: target || "es-MX" }, req.requestId);
     res.json(data);
   } catch (err) {
     res.status(502).json({ error: "AI service error: " + err.message });
@@ -81,7 +98,7 @@ app.post("/translate/batch", async (req, res) => {
   const { texts, target } = req.body || {};
   if (!Array.isArray(texts)) return res.status(400).json({ error: "`texts` (array) is required" });
   try {
-    const data = await callAiService("/translate/batch", { texts, target: target || "es-MX" });
+    const data = await callAiService("/translate/batch", { texts, target: target || "es-MX" }, req.requestId);
     res.json(data);
   } catch (err) {
     res.status(502).json({ error: "AI service error: " + err.message });
