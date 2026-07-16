@@ -326,6 +326,8 @@ git status --porcelain | grep -E '\.env$|node_modules|\.venv|\.db$' && echo "FAI
 
 # 6. trace correlation: grab a request's id from the gateway log, then confirm it in BOTH logs
 grep "<request-id>" gateway.log ai-service.log     # must appear in both services
+# The command above fails due to different filepaths and requestId format
+grep "requestId" backend/gateway-node/gateway.log backend/ai-service-python/ai-service.log
 
 # 7. deployed for real: the public Fly.io gateway answers
 curl -sf https://<your-gateway-app>.fly.dev/health
