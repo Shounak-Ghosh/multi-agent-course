@@ -2,7 +2,7 @@
 
 - **Student:** Shounak Ghosh
 - **Date:** 2026-07-15
-- **Video demo:** TBD — not recorded yet (add link before submitting)
+- **Video demo:** [Link](https://www.loom.com/share/2aab5dfebf104370bb9e6e3e5da45936)
 - **LLM provider / model:** OpenAI `gpt-4o-mini` (Python AI service, two-tier memory+SQLite cache) behind a Node gateway
 - **Backend target:** http://localhost:8787
 
